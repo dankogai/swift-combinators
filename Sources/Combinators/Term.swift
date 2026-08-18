@@ -1,9 +1,11 @@
-/// A term of the SKI combinator calculus.
+/// A term of the combinator calculus.
 ///
-/// A term is either one of the three primitive combinators `S`, `K` and `I`,
-/// a free variable standing for an unknown term, or the application of one
-/// term to another.  Application is written by juxtaposition and associates to
-/// the left, so `SKKx` means `(((S K) K) x)`.
+/// A term is either a primitive combinator, a free variable standing for an
+/// unknown term, or the application of one term to another.  The primitives
+/// cover two classic bases — Schönfinkel's `S`, `K`, `I` and Curry's `B`, `C`,
+/// `K`, `W` — and may be mixed freely; ``rewritten(in:)`` restricts a term to
+/// a single ``Basis``.  Application is written by juxtaposition and associates
+/// to the left, so `SKKx` means `(((S K) K) x)`.
 ///
 /// ```swift
 /// let term: Term = "S(K(SI))K"   // parsed from the classic notation
@@ -16,6 +18,12 @@ public indirect enum Term: Hashable, Sendable {
     case k
     /// The identity combinator: `I x → x`.
     case i
+    /// The composition combinator: `B x y z → x (y z)`.
+    case b
+    /// The exchange combinator: `C x y z → x z y`.
+    case c
+    /// The duplication combinator: `W x y → x y y`.
+    case w
     /// A free variable, which never reduces.
     case variable(String)
     /// The application of one term to another, `f x`.
@@ -77,6 +85,9 @@ extension Term: CustomStringConvertible {
         case .s: "S"
         case .k: "K"
         case .i: "I"
+        case .b: "B"
+        case .c: "C"
+        case .w: "W"
         case .variable(let name): name
         case .apply: "(\(description))"
         }

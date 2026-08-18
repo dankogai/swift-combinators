@@ -11,21 +11,22 @@ public struct ParseError: Error, Hashable, Sendable, CustomStringConvertible {
 extension Term {
     /// Parses a term written in the classic notation.
     ///
-    /// Application is juxtaposition and associates to the left; `S`, `K` and `I`
-    /// denote the primitive combinators and any other single letter or digit is
-    /// a free variable, so `SKKx` is `(((S K) K) x)`.  Parentheses group, and
-    /// whitespace is insignificant.
+    /// Application is juxtaposition and associates to the left; `S`, `K`, `I`,
+    /// `B`, `C` and `W` denote the primitive combinators and any other single
+    /// letter or digit is a free variable, so `SKKx` is `(((S K) K) x)`.
+    /// Parentheses group, and whitespace is insignificant.
     ///
     /// A lambda abstraction may be written `\x.body`, `λxy.body` or `\x -> body`;
-    /// it is eliminated into `S`, `K` and `I` while parsing, and extends as far
-    /// to the right as it can.
+    /// it is eliminated into the primitives of `basis` while parsing, and
+    /// extends as far to the right as it can.
     ///
     /// ```swift
     /// try Term(parsing: "S(K(SI))K")
-    /// try Term(parsing: #"\fx.f(fx)"#)   // the Church numeral 2
+    /// try Term(parsing: #"\fx.f(fx)"#)               // the Church numeral 2
+    /// try Term(parsing: #"\xy.yx"#, basis: .bckw)    // C(WK), not S(K(SI))K
     /// ```
-    public init(parsing source: String) throws {
-        var parser = Parser(source: Array(source))
+    public init(parsing source: String, basis: Basis = .ski) throws {
+        var parser = Parser(source: Array(source), basis: basis)
         self = try parser.parseTerm()
         try parser.expectEndOfInput()
     }
@@ -38,6 +39,7 @@ extension Term {
 ///     lambda ::= ("\" | "λ") letter+ ("." | "->") term
 private struct Parser {
     let source: [Character]
+    let basis: Basis
     var index = 0
 
     var current: Character? { index < source.count ? source[index] : nil }
@@ -90,6 +92,9 @@ private struct Parser {
         case "S": index += 1; return .s
         case "K": index += 1; return .k
         case "I": index += 1; return .i
+        case "B": index += 1; return .b
+        case "C": index += 1; return .c
+        case "W": index += 1; return .w
         case let character where character.isLetter || character.isNumber:
             index += 1
             return .variable(String(character))
@@ -119,7 +124,7 @@ private struct Parser {
             throw ParseError(reason: "expected \".\" or \"->\"", position: index)
         }
         let body = try parseTerm()
-        return variables.reversed().reduce(body) { Term.abstract($1, from: $0) }
+        return variables.reversed().reduce(body) { Term.abstract($1, from: $0, in: basis) }
     }
 }
 

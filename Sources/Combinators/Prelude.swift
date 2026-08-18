@@ -3,15 +3,6 @@ private func v(_ name: String) -> Term { .variable(name) }
 // MARK: - Derived combinators
 
 extension Term {
-    /// `B f g x → f (g x)` — composition, `S(KS)K`.
-    public static let b: Term = "S(KS)K"
-
-    /// `C f x y → f y x` — argument exchange, `S(S(K(S(KS)K))S)(KK)`.
-    public static let c: Term = "S(S(K(S(KS)K))S)(KK)"
-
-    /// `W f x → f x x` — duplication, `SS(KI)`.
-    public static let w: Term = "SS(KI)"
-
     /// `M x → x x` — self-application, `SII`.  Has no normal form when applied
     /// to itself.
     public static let m: Term = "SII"

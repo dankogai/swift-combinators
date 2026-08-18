@@ -97,6 +97,95 @@ struct DerivedTests {
     }
 }
 
+@Suite("BCKW")
+struct BCKWTests {
+    @Test func primitiveRules() throws {
+        #expect(try Term.b(x, y, z).normalize() == x(y(z)))
+        #expect(try Term.c(x, y, z).normalize() == x(z, y))
+        #expect(try Term.w(x, y).normalize() == x(y, y))
+    }
+
+    @Test func extraArgumentsAreKept() throws {
+        #expect(try Term.b(x, y, z, v("w")).normalize() == x(y(z), v("w")))
+        #expect(try Term.w(x, y, z).normalize() == x(y, y, z))
+    }
+
+    @Test func underAppliedTermsAreNormal() {
+        #expect(Term.b(x, y).isNormalForm)
+        #expect(Term.c(x, y).isNormalForm)
+        #expect(Term.w(x).isNormalForm)
+    }
+
+    @Test func identityIsWK() throws {
+        #expect(try Term("WK")(x).normalize() == x)
+    }
+
+    @Test func abstractionStaysInBasis() throws {
+        let lambdas: [Term] = [
+            .lambda("x", body: x, in: .bckw),                     // I
+            .lambda("x", "y", body: y(x), in: .bckw),             // flip apply
+            .lambda("f", "x", body: v("f")(x, x), in: .bckw),     // W
+            .lambda("x", body: x(x), in: .bckw),                  // M
+            .lambda("f", "g", "x", body: v("f")(x, v("g")(x)), in: .bckw),  // S
+        ]
+        for term in lambdas {
+            #expect(term.isExpressed(in: .bckw), "\(term) is not pure BCKW")
+        }
+        // …and they still behave like the lambdas they came from.
+        #expect(try lambdas[0](x).normalize() == x)
+        #expect(try lambdas[1](x, y).normalize() == y(x))
+        #expect(try lambdas[2](x, y).normalize() == x(y, y))
+        #expect(try lambdas[3](x).normalize() == x(x))
+        #expect(try lambdas[4](x, y, z).normalize() == x(z, y(z)))
+    }
+
+    @Test func rewritingIntoSKI() throws {
+        for term in [Term.b, .c, .w] {
+            let rewritten = term.rewritten(in: .ski)
+            #expect(rewritten.isExpressed(in: .ski))
+            #expect(try rewritten(x, y, z).normalize() == term(x, y, z).normalize())
+        }
+    }
+
+    @Test func rewritingIntoBCKW() throws {
+        let s = Term.s.rewritten(in: .bckw)
+        #expect(s.isExpressed(in: .bckw))
+        #expect(try s(x, y, z).normalize() == x(z, y(z)))
+
+        let i = Term.i.rewritten(in: .bckw)
+        #expect(i.isExpressed(in: .bckw))
+        #expect(try i(x).normalize() == x)
+    }
+
+    @Test func rewritingRecursesIntoApplications() throws {
+        let term: Term = "B(SW)x"
+        let rewritten = term.rewritten(in: .ski)
+        #expect(rewritten.isExpressed(in: .ski))
+        #expect(try rewritten(y, z).normalize() == term(y, z).normalize())
+    }
+
+    @Test func thrushIsCI() throws {
+        // T x y → y x; the thrush is C applied to I.
+        let thrush: Term = "S(K(SI))K"
+        #expect(try Term.c(.i)(x, y).normalize() == y(x))
+        #expect(try Term.c(.i)(x, y).normalize() == thrush(x, y).normalize())
+    }
+
+    @Test func parsing() throws {
+        #expect(try Term(parsing: "BCKW") == .b(.c, .k, .w))
+        #expect(try Term(parsing: #"\xy.yx"#, basis: .bckw).isExpressed(in: .bckw))
+        #expect(try Term(parsing: #"\fx.f(fx)"#, basis: .bckw).naturalValue() == 2)
+    }
+
+    @Test func printingRoundTrips() throws {
+        for source in ["B", "BCKW", "B(CK)W", "W(B(CB)I)"] {
+            let term = try Term(parsing: source)
+            #expect(term.description == source)
+            #expect(try Term(parsing: term.description) == term)
+        }
+    }
+}
+
 @Suite("Booleans")
 struct BooleanTests {
     @Test func truthTables() throws {
