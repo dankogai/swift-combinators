@@ -1,6 +1,6 @@
 # swift-combinators
 
-Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), and Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot).
+Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot), and the full aviary of Smullyan's [*To Mock a Mockingbird*](https://en.wikipedia.org/wiki/To_Mock_a_Mockingbird).
 
 ## Synopsis
 
@@ -77,6 +77,26 @@ Both encoders return `nil` for terms with free variables, which the languages
 cannot express.  (Note that iota terms rarely stay iota-pure under reduction:
 `ι`'s own rule reintroduces `S` and `K`.)
 
+## The aviary
+
+Every bird from *To Mock a Mockingbird*, each built by the book's own
+construction and named on `Term`:
+
+```swift
+Term.thrush              // CI       — T a b → b a
+Term.robin               // BBT      — R a b c → b c a
+Term.jay                 // B(BC)(W(BC(B(BBB)))) — J a b c d → a b (a d c)
+Term.turingBird          // LO       — U a b → b (a a b)
+Term.theta               // UU       — Turing's sage bird, Θ a → a (Θ a)
+
+// The book's famous puzzle: a robin composed with itself thrice is a cardinal.
+try Term.robin(.robin, .robin, x, y, z).normalize()   // xzy — behaves like C
+```
+
+`Term.aviary` lists all 46 by name, and the REPL's `:birds` prints them;
+`D E G H J L O Q R U V` come predefined (`M` the mockingbird and `Y` the sage
+were already there).  Every bird's law is verified in the test suite.
+
 ## The REPL
 
 ```sh
@@ -141,6 +161,8 @@ ordinary expression — encode it into one.
   language and `Term(jot:)`/`jotEncoding` for the binary Gödel numbering.
 - A prelude: `M`, `Y`, Church booleans, numerals and pairs, plus decoders
   (`booleanValue()`, `naturalValue()`) to read results back.
+- The aviary — all 46 birds of *To Mock a Mockingbird* as named terms, from
+  `bluebird` to `theta`, each obeying its law under test.
 
 ## Requirements
 
