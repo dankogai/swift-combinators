@@ -24,23 +24,52 @@ extension Term {
         }
     }
 
-    /// Bracket abstraction: builds a term that behaves like `λvariable.body`,
-    /// using nothing but `S`, `K` and `I`.
+    /// Bracket abstraction: builds a term that behaves like `λvariable.body`
+    /// using only the primitives of `basis`.
     ///
-    /// The translation is the classic one, with the η rule as an optimisation:
+    /// For ``Basis/ski`` the translation is the classic one, with the η rule
+    /// as an optimisation:
     ///
     /// - `[x] x = I`
     /// - `[x] E = K E` when `x` is not free in `E`
     /// - `[x] (E x) = E` when `x` is not free in `E`
     /// - `[x] (E₁ E₂) = S ([x] E₁) ([x] E₂)`
-    public static func abstract(_ variable: String, from body: Term) -> Term {
-        if body == .variable(variable) { return .i }
+    ///
+    /// For ``Basis/bckw`` it is Curry's, which dispatches on where the
+    /// variable occurs:
+    ///
+    /// - `[x] x = WK`
+    /// - `[x] E = K E` when `x` is not free in `E`
+    /// - `[x] (E x) = E` when `x` is not free in `E`
+    /// - `[x] (E₁ E₂) = B E₁ ([x] E₂)` when `x` is free only in `E₂`
+    /// - `[x] (E₁ E₂) = C ([x] E₁) E₂` when `x` is free only in `E₁`
+    /// - `[x] (E₁ x) = W ([x] E₁)` when `x` is free in `E₁`
+    /// - `[x] (E₁ E₂) = W (B (C ([x] E₁)) ([x] E₂))` when `x` is free in both
+    public static func abstract(_ variable: String, from body: Term, in basis: Basis = .ski) -> Term {
+        if body == .variable(variable) {
+            return basis == .ski ? .i : Term.w(.k)
+        }
         guard body.freeVariables.contains(variable) else { return .apply(.k, body) }
         guard case .apply(let function, let argument) = body else { return .apply(.k, body) }
-        if argument == .variable(variable), !function.freeVariables.contains(variable) {
-            return function  // η: [x] (E x) = E
+        let isArgumentTheVariable = argument == .variable(variable)
+        guard function.freeVariables.contains(variable) else {
+            if isArgumentTheVariable { return function }  // η: [x] (E x) = E
+            let abstracted = abstract(variable, from: argument, in: basis)
+            return basis == .ski ? Term.s(.apply(.k, function), abstracted)
+                                 : Term.b(function, abstracted)
         }
-        return .s(abstract(variable, from: function), abstract(variable, from: argument))
+        let abstractedFunction = abstract(variable, from: function, in: basis)
+        switch basis {
+        case .ski:
+            return Term.s(abstractedFunction, abstract(variable, from: argument, in: basis))
+        case .bckw:
+            if isArgumentTheVariable { return Term.w(abstractedFunction) }
+            guard argument.freeVariables.contains(variable) else {
+                return Term.c(abstractedFunction, argument)
+            }
+            return Term.w(Term.b(Term.c(abstractedFunction),
+                                 abstract(variable, from: argument, in: basis)))
+        }
     }
 
     /// Bracket abstraction over several variables at once, outermost first.
@@ -48,7 +77,7 @@ extension Term {
     /// ```swift
     /// Term.lambda("x", "y", body: .variable("x"))   // K
     /// ```
-    public static func lambda(_ variables: String..., body: Term) -> Term {
-        variables.reversed().reduce(body) { abstract($1, from: $0) }
+    public static func lambda(_ variables: String..., body: Term, in basis: Basis = .ski) -> Term {
+        variables.reversed().reduce(body) { abstract($1, from: $0, in: basis) }
     }
 }

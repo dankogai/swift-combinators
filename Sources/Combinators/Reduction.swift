@@ -17,8 +17,9 @@ public enum ReductionError: Error, Hashable, Sendable, CustomStringConvertible {
 extension Term {
     /// Contracts the redex at the root of this term, if there is one.
     ///
-    /// The three rules of the calculus are
-    /// `I x → x`, `K x y → x` and `S x y z → x z (y z)`.
+    /// The rules of the calculus are
+    /// `I x → x`, `K x y → x`, `S x y z → x z (y z)`,
+    /// `B x y z → x (y z)`, `C x y z → x z y` and `W x y → x y y`.
     /// Arguments beyond those consumed by the rule are re-applied to the result,
     /// so `Kxyz` contracts to `xz`.
     public func reducedAtRoot() -> Term? {
@@ -31,6 +32,15 @@ extension Term {
         case .s where arguments.count >= 3:
             let (x, y, z) = (arguments[0], arguments[1], arguments[2])
             return Term.applying(.apply(.apply(x, z), .apply(y, z)), to: arguments.dropFirst(3))
+        case .b where arguments.count >= 3:
+            let (x, y, z) = (arguments[0], arguments[1], arguments[2])
+            return Term.applying(.apply(x, .apply(y, z)), to: arguments.dropFirst(3))
+        case .c where arguments.count >= 3:
+            let (x, y, z) = (arguments[0], arguments[1], arguments[2])
+            return Term.applying(.apply(.apply(x, z), y), to: arguments.dropFirst(3))
+        case .w where arguments.count >= 2:
+            let (x, y) = (arguments[0], arguments[1])
+            return Term.applying(.apply(.apply(x, y), y), to: arguments.dropFirst(2))
         default:
             return nil
         }

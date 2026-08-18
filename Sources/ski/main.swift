@@ -9,8 +9,10 @@ import Foundation
 
 let maxSteps = 1_000
 
+var basis = Basis.ski
+
 var definitions: [String: Term] = [
-    "B": .b, "C": .c, "W": .w, "M": .m, "Y": .y,
+    "M": .m, "Y": .y,
     "T": .churchTrue, "F": .churchFalse,
 ]
 for n in 0 ... 9 { definitions[String(n)] = .church(n) }
@@ -23,7 +25,7 @@ func expand(_ term: Term) -> Term {
 @MainActor
 func evaluate(_ source: String, verbose: Bool) {
     do {
-        let term = expand(try Term(parsing: source))
+        let term = expand(try Term(parsing: source, basis: basis))
         if verbose {
             for step in term.reductions.prefix(maxSteps + 1) { print("  \(step)") }
         }
@@ -37,13 +39,23 @@ func evaluate(_ source: String, verbose: Bool) {
     }
 }
 
+func basisNamed(_ name: String) -> Basis? {
+    switch name.lowercased() {
+    case "ski": .ski
+    case "bckw": .bckw
+    default: nil
+    }
+}
+
 let help = """
-    <expression>   reduce a term to normal form; \\x.body abstracts a variable
-    :v <expr>      print every reduction step
-    :let X = <expr>  bind a single-character name
-    :env           list the bound names
-    :help          this message
-    :quit          leave
+    <expression>       reduce a term to normal form; \\x.body abstracts a variable
+    :v <expr>          print every reduction step
+    :let X = <expr>    bind a single-character name
+    :env               list the bound names
+    :basis [ski|bckw]  show or set the basis lambdas are eliminated into
+    :to <basis> <expr> rewrite a term into the given basis
+    :help              this message
+    :quit              leave
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -51,7 +63,7 @@ if !arguments.isEmpty {
     let verbose = arguments.first == "-v"
     evaluate(arguments.drop { $0 == "-v" }.joined(separator: " "), verbose: verbose)
 } else {
-    print("SKI combinator calculus. :help for help, :quit to leave.")
+    print("Combinator calculus (SKI + BCKW). :help for help, :quit to leave.")
     while true {
         print("ski> ", terminator: "")
         guard let line = readLine() else { break }
@@ -63,6 +75,27 @@ if !arguments.isEmpty {
         case ":env":
             for (name, term) in definitions.sorted(by: { $0.key < $1.key }) {
                 print("  \(name) = \(term)")
+            }
+        case ":basis":
+            print("  basis: \(basis == .ski ? "ski" : "bckw")")
+        case let input where input.hasPrefix(":basis "):
+            let name = input.dropFirst(7).trimmingCharacters(in: .whitespaces)
+            if let named = basisNamed(name) {
+                basis = named
+            } else {
+                print("error: unknown basis \(name); expected ski or bckw")
+            }
+        case let input where input.hasPrefix(":to "):
+            let parts = input.dropFirst(4).split(separator: " ", maxSplits: 1)
+            guard parts.count == 2, let target = basisNamed(String(parts[0])) else {
+                print("error: expected :to <ski|bckw> <expression>")
+                continue
+            }
+            do {
+                let term = expand(try Term(parsing: String(parts[1]), basis: basis))
+                print(term.rewritten(in: target))
+            } catch {
+                print("error: \(error)")
             }
         case let input where input.hasPrefix(":v "):
             evaluate(String(input.dropFirst(3)), verbose: true)

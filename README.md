@@ -1,6 +1,6 @@
 # swift-combinators
 
-Combinator calculus in Swift — starting with the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus).
+Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus) and Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system).
 
 ## Synopsis
 
@@ -36,6 +36,25 @@ for step in Term("SKKx").reductions { print(step) }
 // x
 ```
 
+## BCKW
+
+`B`, `C` and `W` are primitives too — `B x y z → x (y z)`, `C x y z → x z y`,
+`W x y → x y y` — so terms may mix both bases freely, and either basis can be
+targeted or eliminated:
+
+```swift
+// Bracket abstraction into Curry's basis instead of Schönfinkel's:
+try Term(parsing: #"\xy.yx"#, basis: .bckw)   // C(WK), pure BCKW
+Term.lambda("f", "x", body: .variable("f")(x, x), in: .bckw)   // W
+
+// Rewrite a term into a single basis:
+Term.b.rewritten(in: .ski)    // S(KS)K
+Term.s.rewritten(in: .bckw)   // B(BW)(BBC)
+Term.i.rewritten(in: .bckw)   // WK
+
+Term("B(SW)x").rewritten(in: .ski).isExpressed(in: .ski)   // true
+```
+
 ## The REPL
 
 ```sh
@@ -60,21 +79,35 @@ ski> A23
 S(S(KS)(S(KK)(S(S(KS)K)I)))(S(S(KS)K)(S(S(KS)K)I))    -- 5
 ```
 
-The REPL predefines `B C W M Y`, the booleans `T F`, and the digits `0`–`9` as
-Church numerals. `:help` lists the commands.
+The REPL predefines `M Y`, the booleans `T F`, and the digits `0`–`9` as
+Church numerals; `S K I B C W` are the primitives. `:basis bckw` switches
+which basis lambdas are eliminated into, and `:to <basis> <expr>` rewrites a
+term into a basis:
+
+```
+ski> :basis bckw
+ski> \xy.yx
+C(WK)
+ski> :to bckw S
+B(BW)(BBC)
+```
+
+`:help` lists the commands.
 
 ## What's inside
 
-- `Term` — an `indirect enum` over `S`, `K`, `I`, free variables and
-  application, with parsing (`"S(K(SI))K"`, `λ`-syntax) and minimal-parenthesis
-  printing.
+- `Term` — an `indirect enum` over the primitives `S K I B C W`, free
+  variables and application, with parsing (`"S(K(SI))K"`, `λ`-syntax) and
+  minimal-parenthesis printing.
 - Normal-order (leftmost-outermost) reduction: `reduced()`, the lazy
   `reductions` sequence, and bounded `normalize(maxSteps:)` — total, because
   terms like `Ω` never terminate.
-- Bracket abstraction (`Term.lambda`/`Term.abstract`) with the η-rule, so any
-  λ-term can be compiled to pure SKI.
-- A prelude: `B`, `C`, `W`, `M`, `Y`, Church booleans, numerals and pairs, plus
-  decoders (`booleanValue()`, `naturalValue()`) to read results back.
+- Bracket abstraction (`Term.lambda`/`Term.abstract`) with the η-rule, into
+  either basis: the classic SKI translation or Curry's BCKW one.
+- `Basis` — `.ski` and `.bckw`, with `rewritten(in:)` to translate any term
+  into a single basis and `isExpressed(in:)` to check membership.
+- A prelude: `M`, `Y`, Church booleans, numerals and pairs, plus decoders
+  (`booleanValue()`, `naturalValue()`) to read results back.
 
 ## Requirements
 
