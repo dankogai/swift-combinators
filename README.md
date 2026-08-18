@@ -1,6 +1,6 @@
 # swift-combinators
 
-Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus) and Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system).
+Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), and Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot).
 
 ## Synopsis
 
@@ -55,6 +55,28 @@ Term.i.rewritten(in: .bckw)   // WK
 Term("B(SW)x").rewritten(in: .ski).isExpressed(in: .ski)   // true
 ```
 
+## Iota and Jot
+
+`ι` is a primitive too, with the rule `ι x → x S K`; the whole calculus folds
+into it (`I = ιι`, `K = ι(ι(ιι))`, `S = ι(ι(ι(ιι)))`):
+
+```swift
+// Barker's Iota language: i (or ι) and prefix application *FG
+try Term(iota: "*i*i*ii")     // ι(ι(ιι)), which behaves like K
+Term.k.iotaEncoding           // "*i*i*ii"
+Term.s.rewritten(in: .iota)   // ι(ι(ι(ιι)))
+
+// Jot: every string of 0s and 1s is a program —
+// [] = I, [F0] = FSK, [F1] = λxy.F(xy)
+try Term(jot: "11100")        // behaves like K
+try Term(jot: "11111000")     // behaves like S
+Term.s.jotEncoding            // "11111000" — a Gödel numbering of all terms
+```
+
+Both encoders return `nil` for terms with free variables, which the languages
+cannot express.  (Note that iota terms rarely stay iota-pure under reduction:
+`ι`'s own rule reintroduces `S` and `K`.)
+
 ## The REPL
 
 ```sh
@@ -90,13 +112,22 @@ ski> \xy.yx
 C(WK)
 ski> :to bckw S
 B(BW)(BBC)
+ski> :iota *i*i*ii
+K    -- true
+ski> :jot 11111000
+S
+ski> :jot S(K(SI))K
+11111110001111001111110001111111000111001110011100
 ```
+
+`:iota` and `:jot` evaluate a program in those languages, or — given an
+ordinary expression — encode it into one.
 
 `:help` lists the commands.
 
 ## What's inside
 
-- `Term` — an `indirect enum` over the primitives `S K I B C W`, free
+- `Term` — an `indirect enum` over the primitives `S K I B C W ι`, free
   variables and application, with parsing (`"S(K(SI))K"`, `λ`-syntax) and
   minimal-parenthesis printing.
 - Normal-order (leftmost-outermost) reduction: `reduced()`, the lazy
@@ -104,8 +135,10 @@ B(BW)(BBC)
   terms like `Ω` never terminate.
 - Bracket abstraction (`Term.lambda`/`Term.abstract`) with the η-rule, into
   either basis: the classic SKI translation or Curry's BCKW one.
-- `Basis` — `.ski` and `.bckw`, with `rewritten(in:)` to translate any term
-  into a single basis and `isExpressed(in:)` to check membership.
+- `Basis` — `.ski`, `.bckw` and `.iota`, with `rewritten(in:)` to translate
+  any term into a single basis and `isExpressed(in:)` to check membership.
+- Iota and Jot codecs — `Term(iota:)`/`iotaEncoding` for the `*FG` prefix
+  language and `Term(jot:)`/`jotEncoding` for the binary Gödel numbering.
 - A prelude: `M`, `Y`, Church booleans, numerals and pairs, plus decoders
   (`booleanValue()`, `naturalValue()`) to read results back.
 

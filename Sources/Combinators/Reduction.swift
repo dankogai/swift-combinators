@@ -19,7 +19,8 @@ extension Term {
     ///
     /// The rules of the calculus are
     /// `I x → x`, `K x y → x`, `S x y z → x z (y z)`,
-    /// `B x y z → x (y z)`, `C x y z → x z y` and `W x y → x y y`.
+    /// `B x y z → x (y z)`, `C x y z → x z y`, `W x y → x y y` and
+    /// `ι x → x S K`.
     /// Arguments beyond those consumed by the rule are re-applied to the result,
     /// so `Kxyz` contracts to `xz`.
     public func reducedAtRoot() -> Term? {
@@ -41,6 +42,8 @@ extension Term {
         case .w where arguments.count >= 2:
             let (x, y) = (arguments[0], arguments[1])
             return Term.applying(.apply(.apply(x, y), y), to: arguments.dropFirst(2))
+        case .iota where arguments.count >= 1:
+            return Term.applying(.apply(.apply(arguments[0], .s), .k), to: arguments.dropFirst(1))
         default:
             return nil
         }

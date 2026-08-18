@@ -4,12 +4,15 @@ public enum Basis: Hashable, Sendable, CaseIterable {
     case ski
     /// Curry's basis: `B`, `C`, `K` and `W`.
     case bckw
+    /// Barker's basis: the single combinator `ι`, where `ι x → x S K`.
+    case iota
 
     /// The primitive combinators of the basis.
     public var primitives: [Term] {
         switch self {
         case .ski: [.s, .k, .i]
         case .bckw: [.b, .c, .k, .w]
+        case .iota: [.iota]
         }
     }
 
@@ -18,6 +21,7 @@ public enum Basis: Hashable, Sendable, CaseIterable {
         switch self {
         case .ski: Self.skiEncodings
         case .bckw: Self.bckwEncodings
+        case .iota: Self.iotaEncodings
         }
     }
 
@@ -25,12 +29,37 @@ public enum Basis: Hashable, Sendable, CaseIterable {
         .b: "S(KS)K",
         .c: "S(S(K(S(KS)K))S)(KK)",
         .w: "SS(KI)",
+        .iota: "S(SI(KS))(KK)",
     ]
 
     private static let bckwEncodings: [Term: Term] = [
         .s: "B(BW)(BBC)",
         .i: "WK",
+        .iota: "C(C(WK)S)K",
     ]
+
+    private static let iotaEncodings: [Term: Term] = {
+        let identity: Term = .iota(.iota)              // ιι
+        let constant: Term = .iota(.iota(identity))    // ι(ι(ιι))
+        let substitution: Term = .iota(constant)       // ι(ι(ι(ιι)))
+        // The SKI encodings of B, C and W contain only S, K and I, so mapping
+        // those leaves suffices to bring them into the iota basis too.
+        func inIota(_ term: Term) -> Term {
+            switch term {
+            case .apply(let function, let argument):
+                .apply(inIota(function), inIota(argument))
+            case .s: substitution
+            case .k: constant
+            case .i: identity
+            default: term
+            }
+        }
+        var encodings: [Term: Term] = [.s: substitution, .k: constant, .i: identity]
+        for combinator in [Term.b, .c, .w] {
+            encodings[combinator] = inIota(skiEncodings[combinator]!)
+        }
+        return encodings
+    }()
 }
 
 extension Term {

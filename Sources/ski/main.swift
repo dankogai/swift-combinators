@@ -25,7 +25,15 @@ func expand(_ term: Term) -> Term {
 @MainActor
 func evaluate(_ source: String, verbose: Bool) {
     do {
-        let term = expand(try Term(parsing: source, basis: basis))
+        evaluate(expand(try Term(parsing: source, basis: basis)), verbose: verbose)
+    } catch {
+        print("error: \(error)")
+    }
+}
+
+@MainActor
+func evaluate(_ term: Term, verbose: Bool) {
+    do {
         if verbose {
             for step in term.reductions.prefix(maxSteps + 1) { print("  \(step)") }
         }
@@ -43,6 +51,7 @@ func basisNamed(_ name: String) -> Basis? {
     switch name.lowercased() {
     case "ski": .ski
     case "bckw": .bckw
+    case "iota", "\u{03B9}": .iota
     default: nil
     }
 }
@@ -52,8 +61,13 @@ let help = """
     :v <expr>          print every reduction step
     :let X = <expr>    bind a single-character name
     :env               list the bound names
-    :basis [ski|bckw]  show or set the basis lambdas are eliminated into
+    :basis <name>      show or set the basis (ski, bckw or iota) lambdas
+                       are eliminated into
     :to <basis> <expr> rewrite a term into the given basis
+    :iota <prog|expr>  evaluate an Iota program (*FG notation), or encode
+                       a closed term as one
+    :jot <bits|expr>   evaluate a Jot program (a string of 0s and 1s), or
+                       encode a closed term as one
     :help              this message
     :quit              leave
     """
@@ -63,7 +77,7 @@ if !arguments.isEmpty {
     let verbose = arguments.first == "-v"
     evaluate(arguments.drop { $0 == "-v" }.joined(separator: " "), verbose: verbose)
 } else {
-    print("Combinator calculus (SKI + BCKW). :help for help, :quit to leave.")
+    print("Combinator calculus (SKI, BCKW, Iota/Jot). :help for help, :quit to leave.")
     while true {
         print("ski> ", terminator: "")
         guard let line = readLine() else { break }
@@ -77,13 +91,39 @@ if !arguments.isEmpty {
                 print("  \(name) = \(term)")
             }
         case ":basis":
-            print("  basis: \(basis == .ski ? "ski" : "bckw")")
+            print("  basis: \(["ski", "bckw", "iota"][Basis.allCases.firstIndex(of: basis)!])")
         case let input where input.hasPrefix(":basis "):
             let name = input.dropFirst(7).trimmingCharacters(in: .whitespaces)
             if let named = basisNamed(name) {
                 basis = named
             } else {
-                print("error: unknown basis \(name); expected ski or bckw")
+                print("error: unknown basis \(name); expected ski, bckw or iota")
+            }
+        case let input where input.hasPrefix(":iota "):
+            let text = String(input.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            do {
+                if text.allSatisfy({ "*iι".contains($0) || $0.isWhitespace }) {
+                    evaluate(try Term(iota: text), verbose: false)
+                } else if let encoding = expand(try Term(parsing: text, basis: basis)).iotaEncoding {
+                    print(encoding)
+                } else {
+                    print("error: the term has free variables, which Iota cannot express")
+                }
+            } catch {
+                print("error: \(error)")
+            }
+        case let input where input.hasPrefix(":jot "):
+            let text = String(input.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            do {
+                if text.allSatisfy({ "01".contains($0) || $0.isWhitespace }) {
+                    evaluate(try Term(jot: text), verbose: false)
+                } else if let encoding = expand(try Term(parsing: text, basis: basis)).jotEncoding {
+                    print(encoding)
+                } else {
+                    print("error: the term has free variables, which Jot cannot express")
+                }
+            } catch {
+                print("error: \(error)")
             }
         case let input where input.hasPrefix(":to "):
             let parts = input.dropFirst(4).split(separator: " ", maxSplits: 1)

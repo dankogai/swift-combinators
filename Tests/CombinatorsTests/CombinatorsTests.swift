@@ -186,6 +186,82 @@ struct BCKWTests {
     }
 }
 
+@Suite("Iota and Jot")
+struct IotaJotTests {
+    @Test func iotaRule() throws {
+        #expect(try Term.iota(x).normalize() == x(.s, .k))
+    }
+
+    @Test func skiFromIota() throws {
+        #expect(try Term(iota: "*ii")(x).normalize() == x)                        // I = ιι
+        #expect(try Term(iota: "*i*i*ii")(x, y).normalize() == x)                 // K = ι(ι(ιι))
+        #expect(try Term(iota: "*i*i*i*ii")(x, y, z).normalize() == x(z, y(z)))   // S = ι(ι(ι(ιι)))
+    }
+
+    @Test func rewritingIntoIota() throws {
+        let table: [(Term, [Term], Term)] = [
+            (.s, [x, y, z], x(z, y(z))),
+            (.k, [x, y], x),
+            (.i, [x], x),
+            (.b, [x, y, z], x(y(z))),
+            (.c, [x, y, z], x(z, y)),
+            (.w, [x, y], x(y, y)),
+        ]
+        for (combinator, arguments, expected) in table {
+            let rewritten = combinator.rewritten(in: .iota)
+            #expect(rewritten.isExpressed(in: .iota))
+            #expect(try Term.applying(rewritten, to: arguments).normalize(maxSteps: 100_000) == expected)
+        }
+    }
+
+    @Test func abstractionStaysInBasis() throws {
+        let lambda = Term.lambda("x", "y", body: y(x), in: .iota)
+        #expect(lambda.isExpressed(in: .iota))
+        #expect(try lambda(x, y).normalize(maxSteps: 100_000) == y(x))
+    }
+
+    @Test func iotaSyntax() throws {
+        #expect(try Term(iota: "*ii") == .iota(.iota))
+        #expect(try Term(iota: " * i \u{03B9} ") == .iota(.iota))  // ι works too
+        #expect(throws: ParseError.self) { try Term(iota: "") }
+        #expect(throws: ParseError.self) { try Term(iota: "*i") }   // missing an operand
+        #expect(throws: ParseError.self) { try Term(iota: "ii") }   // trailing junk
+        #expect(throws: ParseError.self) { try Term(iota: "*ix") }  // no variables
+    }
+
+    @Test func iotaEncodingRoundTrips() throws {
+        for term in [Term.s, .k, .i, "S(K(SI))K", .b(.s, .w)] {
+            let encoding = try #require(term.iotaEncoding)
+            let decoded = try Term(iota: encoding)
+            #expect(try decoded(x, y, z).normalize(maxSteps: 100_000)
+                 == term(x, y, z).normalize(maxSteps: 100_000))
+        }
+        #expect(Term.k.iotaEncoding == "*i*i*ii")
+        #expect(x.iotaEncoding == nil)
+    }
+
+    @Test func jotDecoding() throws {
+        #expect(try Term(jot: "") == .i)
+        #expect(try Term(jot: "11100")(x, y).normalize(maxSteps: 100_000) == x)   // K
+        #expect(try Term(jot: "11111000")(x, y, z).normalize(maxSteps: 100_000) == x(z, y(z)))  // S
+        #expect(try Term(jot: "0")(x, y).normalize() == y)   // [0] = ISK = SK, i.e. false
+        #expect(throws: ParseError.self) { try Term(jot: "10201") }
+    }
+
+    @Test func jotEncodingRoundTrips() throws {
+        #expect(Term.s.jotEncoding == "11111000")
+        #expect(Term.k.jotEncoding == "11100")
+        for term in [Term.s, .k, .i, .b, .c, .w, .iota, "S(K(SI))K"] {
+            let encoding = try #require(term.jotEncoding)
+            #expect(encoding.allSatisfy { $0 == "0" || $0 == "1" })
+            let decoded = try Term(jot: encoding)
+            #expect(try decoded(x, y, z).normalize(maxSteps: 100_000)
+                 == term(x, y, z).normalize(maxSteps: 100_000))
+        }
+        #expect(x.jotEncoding == nil)
+    }
+}
+
 @Suite("Booleans")
 struct BooleanTests {
     @Test func truthTables() throws {
