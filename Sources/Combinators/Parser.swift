@@ -12,8 +12,8 @@ extension Term {
     /// Parses a term written in the classic notation.
     ///
     /// Application is juxtaposition and associates to the left; `S`, `K`, `I`,
-    /// `B`, `C` and `W` denote the primitive combinators and any other single
-    /// letter or digit is a free variable, so `SKKx` is `(((S K) K) x)`.
+    /// `B`, `C`, `W` and `ι` denote the primitive combinators and any other
+    /// single letter or digit is a free variable, so `SKKx` is `(((S K) K) x)`.
     /// Parentheses group, and whitespace is insignificant.
     ///
     /// A lambda abstraction may be written `\x.body`, `λxy.body` or `\x -> body`;
@@ -95,6 +95,7 @@ private struct Parser {
         case "B": index += 1; return .b
         case "C": index += 1; return .c
         case "W": index += 1; return .w
+        case "ι": index += 1; return .iota
         case let character where character.isLetter || character.isNumber:
             index += 1
             return .variable(String(character))
