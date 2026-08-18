@@ -57,7 +57,17 @@ func basisNamed(_ name: String) -> Basis? {
     case "ski": .ski
     case "bckw": .bckw
     case "iota", "\u{03B9}": .iota
+    case "x": .x
     default: nil
+    }
+}
+
+func basisName(_ basis: Basis) -> String {
+    switch basis {
+    case .ski: "ski"
+    case .bckw: "bckw"
+    case .iota: "iota"
+    case .x: "x"
     }
 }
 
@@ -67,7 +77,7 @@ let help = """
     :let X = <expr>    bind a single-character name
     :env               list the bound names
     :birds             list every bird from “To Mock a Mockingbird”
-    :basis <name>      show or set the basis (ski, bckw or iota) lambdas
+    :basis <name>      show or set the basis (ski, bckw, iota or x) lambdas
                        are eliminated into
     :to <basis> <expr> rewrite a term into the given basis
     :iota <prog|expr>  evaluate an Iota program (*FG notation), or encode
@@ -83,7 +93,7 @@ if !arguments.isEmpty {
     let verbose = arguments.first == "-v"
     evaluate(arguments.drop { $0 == "-v" }.joined(separator: " "), verbose: verbose)
 } else {
-    print("Combinator calculus (SKI, BCKW, Iota/Jot). :help for help, :quit to leave.")
+    print("Combinator calculus (SKI, BCKW, Iota/Jot, X). :help for help, :quit to leave.")
     while true {
         print("ski> ", terminator: "")
         guard let line = readLine() else { break }
@@ -102,13 +112,13 @@ if !arguments.isEmpty {
                 print("  \(name) = \(term)")
             }
         case ":basis":
-            print("  basis: \(["ski", "bckw", "iota"][Basis.allCases.firstIndex(of: basis)!])")
+            print("  basis: \(basisName(basis))")
         case let input where input.hasPrefix(":basis "):
             let name = input.dropFirst(7).trimmingCharacters(in: .whitespaces)
             if let named = basisNamed(name) {
                 basis = named
             } else {
-                print("error: unknown basis \(name); expected ski, bckw or iota")
+                print("error: unknown basis \(name); expected ski, bckw, iota or x")
             }
         case let input where input.hasPrefix(":iota "):
             let text = String(input.dropFirst(6)).trimmingCharacters(in: .whitespaces)

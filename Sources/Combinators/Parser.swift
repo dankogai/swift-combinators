@@ -12,7 +12,7 @@ extension Term {
     /// Parses a term written in the classic notation.
     ///
     /// Application is juxtaposition and associates to the left; `S`, `K`, `I`,
-    /// `B`, `C`, `W` and `ι` denote the primitive combinators and any other
+    /// `B`, `C`, `W`, `ι` and `X` denote the primitive combinators and any other
     /// single letter or digit is a free variable, so `SKKx` is `(((S K) K) x)`.
     /// Parentheses group, and whitespace is insignificant.
     ///
@@ -96,6 +96,7 @@ private struct Parser {
         case "C": index += 1; return .c
         case "W": index += 1; return .w
         case "ι": index += 1; return .iota
+        case "X": index += 1; return .x
         case let character where character.isLetter || character.isNumber:
             index += 1
             return .variable(String(character))

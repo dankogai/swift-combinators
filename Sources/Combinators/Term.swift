@@ -2,8 +2,9 @@
 ///
 /// A term is either a primitive combinator, a free variable standing for an
 /// unknown term, or the application of one term to another.  The primitives
-/// cover three classic bases — Schönfinkel's `S`, `K`, `I`, Curry's `B`, `C`,
-/// `K`, `W` and Barker's single-combinator `ι` — and may be mixed freely;
+/// cover four classic bases — Schönfinkel's `S`, `K`, `I`, Curry's `B`, `C`,
+/// `K`, `W`, Barker's single-combinator `ι` and the one-point `X` — and may
+/// be mixed freely;
 /// ``rewritten(in:)`` restricts a term to a single ``Basis``.  Application is written by juxtaposition and associates
 /// to the left, so `SKKx` means `(((S K) K) x)`.
 ///
@@ -26,6 +27,9 @@ public indirect enum Term: Hashable, Sendable {
     case w
     /// Barker's iota combinator: `ι x → x S K`.
     case iota
+    /// The one-point-basis combinator: `X a → a K S K`, whence `K = XXX` and
+    /// `S = X(XX)`.
+    case x
     /// A free variable, which never reduces.
     case variable(String)
     /// The application of one term to another, `f x`.
@@ -91,6 +95,7 @@ extension Term: CustomStringConvertible {
         case .c: "C"
         case .w: "W"
         case .iota: "ι"
+        case .x: "X"
         case .variable(let name): name
         case .apply: "(\(description))"
         }

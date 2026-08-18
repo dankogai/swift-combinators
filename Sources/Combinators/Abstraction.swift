@@ -46,11 +46,11 @@ extension Term {
     /// - `[x] (E₁ x) = W ([x] E₁)` when `x` is free in `E₁`
     /// - `[x] (E₁ E₂) = W (B (C ([x] E₁)) ([x] E₂))` when `x` is free in both
     ///
-    /// For ``Basis/iota`` the SKI translation is performed first and the
-    /// result is rewritten into the iota basis.
+    /// For the one-point bases ``Basis/iota`` and ``Basis/x`` the SKI
+    /// translation is performed first and the result is rewritten.
     public static func abstract(_ variable: String, from body: Term, in basis: Basis = .ski) -> Term {
-        if basis == .iota {
-            return abstract(variable, from: body, in: .ski).rewritten(in: .iota)
+        if basis == .iota || basis == .x {
+            return abstract(variable, from: body, in: .ski).rewritten(in: basis)
         }
         if body == .variable(variable) {
             return basis == .ski ? .i : Term.w(.k)
@@ -66,7 +66,7 @@ extension Term {
         }
         let abstractedFunction = abstract(variable, from: function, in: basis)
         switch basis {
-        case .ski, .iota:  // .iota was already delegated to .ski above
+        case .ski, .iota, .x:  // the one-point bases were already delegated to .ski above
             return Term.s(abstractedFunction, abstract(variable, from: argument, in: basis))
         case .bckw:
             if isArgumentTheVariable { return Term.w(abstractedFunction) }
