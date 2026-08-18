@@ -1,6 +1,6 @@
 # swift-combinators
 
-Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot), and the full aviary of Smullyan's [*To Mock a Mockingbird*](https://en.wikipedia.org/wiki/To_Mock_a_Mockingbird).
+Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot), the [one-point basis](https://en.wikipedia.org/wiki/Combinatory_logic#One-point_basis) `X`, and the full aviary of Smullyan's [*To Mock a Mockingbird*](https://en.wikipedia.org/wiki/To_Mock_a_Mockingbird).
 
 ## Synopsis
 
@@ -77,6 +77,20 @@ Both encoders return `nil` for terms with free variables, which the languages
 cannot express.  (Note that iota terms rarely stay iota-pure under reduction:
 `ι`'s own rule reintroduces `S` and `K`.)
 
+## The X combinator
+
+Another one-point basis, with an even tidier bootstrap than `ι`'s:
+`X a → a K S K`, so the whole calculus falls out of self-application —
+exactly, not merely extensionally:
+
+```swift
+try Term("XXX").normalize()     // K — literally the primitive
+try Term("X(XX)").normalize()   // S
+Term.k.rewritten(in: .x)        // XXX
+Term.s.rewritten(in: .x)        // X(XX)
+try Term(parsing: #"\xy.yx"#, basis: .x).isExpressed(in: .x)   // true
+```
+
 ## The aviary
 
 Every bird from *To Mock a Mockingbird*, each built by the book's own
@@ -147,7 +161,7 @@ ordinary expression — encode it into one.
 
 ## What's inside
 
-- `Term` — an `indirect enum` over the primitives `S K I B C W ι`, free
+- `Term` — an `indirect enum` over the primitives `S K I B C W ι X`, free
   variables and application, with parsing (`"S(K(SI))K"`, `λ`-syntax) and
   minimal-parenthesis printing.
 - Normal-order (leftmost-outermost) reduction: `reduced()`, the lazy
@@ -155,8 +169,9 @@ ordinary expression — encode it into one.
   terms like `Ω` never terminate.
 - Bracket abstraction (`Term.lambda`/`Term.abstract`) with the η-rule, into
   either basis: the classic SKI translation or Curry's BCKW one.
-- `Basis` — `.ski`, `.bckw` and `.iota`, with `rewritten(in:)` to translate
-  any term into a single basis and `isExpressed(in:)` to check membership.
+- `Basis` — `.ski`, `.bckw`, `.iota` and the one-point `.x`, with
+  `rewritten(in:)` to translate any term into a single basis and
+  `isExpressed(in:)` to check membership.
 - Iota and Jot codecs — `Term(iota:)`/`iotaEncoding` for the `*FG` prefix
   language and `Term(jot:)`/`jotEncoding` for the binary Gödel numbering.
 - A prelude: `M`, `Y`, Church booleans, numerals and pairs, plus decoders

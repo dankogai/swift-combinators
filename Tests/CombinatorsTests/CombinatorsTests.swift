@@ -186,6 +186,80 @@ struct BCKWTests {
     }
 }
 
+@Suite("Basis closure")
+struct BasisClosureTests {
+    let primitives: [Term] = [.s, .k, .i, .b, .c, .w, .iota, .x]
+
+    @Test func everyEncodingStaysInItsBasis() {
+        for basis in Basis.allCases {
+            for primitive in primitives {
+                #expect(primitive.rewritten(in: basis).isExpressed(in: basis),
+                        "\(primitive) rewritten into \(basis) escapes the basis")
+            }
+        }
+    }
+
+    @Test func everyEncodingIsExtensionallyFaithful() throws {
+        // Probing with I first flushes out any encoded S or K hiding in the
+        // reduct, so both sides meet in an all-variable normal form.
+        let probe: [Term] = [.i, x, y, z, v("u")]
+        for basis in Basis.allCases {
+            for primitive in primitives {
+                let expected = try Term.applying(primitive, to: probe)
+                    .normalize(maxSteps: 1_000_000)
+                let actual = try Term.applying(primitive.rewritten(in: basis), to: probe)
+                    .normalize(maxSteps: 1_000_000)
+                #expect(actual == expected, "\(primitive) in \(basis) misbehaves")
+            }
+        }
+    }
+}
+
+@Suite("X combinator")
+struct XCombinatorTests {
+    @Test func rule() throws {
+        #expect(try Term.x(x).normalize() == x(.k, .s, .k))
+    }
+
+    @Test func bootstrapsTheWholeCalculus() throws {
+        // The whole point of X: S and K fall out of self-application — exactly,
+        // not merely extensionally.
+        #expect(try Term("XXX").normalize() == .k)
+        #expect(try Term("X(XX)").normalize() == .s)
+        #expect(try Term("X(XX)(XXX)(XXX)")(x).normalize() == x)   // SKK = I
+    }
+
+    @Test func rewritingIntoX() throws {
+        let table: [(Term, [Term], Term)] = [
+            (.s, [x, y, z], x(z, y(z))),
+            (.k, [x, y], x),
+            (.i, [x], x),
+            (.b, [x, y, z], x(y(z))),
+            (.c, [x, y, z], x(z, y)),
+            (.w, [x, y], x(y, y)),
+            (.iota, [x], x(.s, .k)),
+        ]
+        for (combinator, arguments, expected) in table {
+            let rewritten = combinator.rewritten(in: .x)
+            #expect(rewritten.isExpressed(in: .x))
+            #expect(try Term.applying(rewritten, to: arguments).normalize(maxSteps: 100_000) == expected)
+        }
+        #expect(Term.k.rewritten(in: .x) == "XXX")
+        #expect(Term.s.rewritten(in: .x) == "X(XX)")
+    }
+
+    @Test func abstractionStaysInBasis() throws {
+        let lambda = Term.lambda("x", "y", body: y(x), in: .x)
+        #expect(lambda.isExpressed(in: .x))
+        #expect(try lambda(x, y).normalize(maxSteps: 100_000) == y(x))
+    }
+
+    @Test func parsingAndPrinting() throws {
+        #expect(try Term(parsing: "X(XX)") == .x(.x(.x)))
+        #expect(Term.x(.x(.x)).description == "X(XX)")
+    }
+}
+
 @Suite("Birds")
 struct BirdTests {
     let a = v("a"), b = v("b"), c = v("c"), d = v("d")
@@ -352,7 +426,7 @@ struct IotaJotTests {
     @Test func jotEncodingRoundTrips() throws {
         #expect(Term.s.jotEncoding == "11111000")
         #expect(Term.k.jotEncoding == "11100")
-        for term in [Term.s, .k, .i, .b, .c, .w, .iota, "S(K(SI))K"] {
+        for term in [Term.s, .k, .i, .b, .c, .w, .iota, .x, "S(K(SI))K"] {
             let encoding = try #require(term.jotEncoding)
             #expect(encoding.allSatisfy { $0 == "0" || $0 == "1" })
             let decoded = try Term(jot: encoding)
