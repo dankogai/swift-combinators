@@ -14,6 +14,11 @@ var basis = Basis.ski
 var definitions: [String: Term] = [
     "M": .m, "Y": .y,
     "T": .churchTrue, "F": .churchFalse,
+    // Birds from “To Mock a Mockingbird” whose letters are free.
+    // (T and F stay the Church booleans; :let T = CI gets you the thrush.)
+    "D": .dove, "E": .eagle, "G": .goldfinch, "H": .hummingbird,
+    "J": .jay, "L": .lark, "O": .owl, "Q": .queerBird,
+    "R": .robin, "U": .turingBird, "V": .vireo,
 ]
 for n in 0 ... 9 { definitions[String(n)] = .church(n) }
 
@@ -61,6 +66,7 @@ let help = """
     :v <expr>          print every reduction step
     :let X = <expr>    bind a single-character name
     :env               list the bound names
+    :birds             list every bird from “To Mock a Mockingbird”
     :basis <name>      show or set the basis (ski, bckw or iota) lambdas
                        are eliminated into
     :to <basis> <expr> rewrite a term into the given basis
@@ -86,6 +92,11 @@ if !arguments.isEmpty {
         case "": continue
         case ":quit", ":q": exit(0)
         case ":help", ":h", ":?": print(help)
+        case ":birds":
+            let width = Term.aviary.map(\.name.count).max() ?? 0
+            for (name, term) in Term.aviary {
+                print("  \(name.padding(toLength: width, withPad: " ", startingAt: 0))  \(term)")
+            }
         case ":env":
             for (name, term) in definitions.sorted(by: { $0.key < $1.key }) {
                 print("  \(name) = \(term)")

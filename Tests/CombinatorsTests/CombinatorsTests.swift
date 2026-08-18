@@ -186,6 +186,107 @@ struct BCKWTests {
     }
 }
 
+@Suite("Birds")
+struct BirdTests {
+    let a = v("a"), b = v("b"), c = v("c"), d = v("d")
+    let e = v("e"), f = v("f"), g = v("g")
+
+    /// Every bird except the two sage birds, with the law from the book.
+    var laws: [(name: String, bird: Term, arguments: [Term], result: Term)] {
+        [
+            ("bald eagle", .baldEagle, [a, b, c, d, e, f, g], a(b(c, d), e(f, g))),
+            ("becard", .becard, [a, b, c, d], a(b(c(d)))),
+            ("blackbird", .blackbird, [a, b, c, d], a(b(c, d))),
+            ("bluebird", .bluebird, [a, b, c], a(b(c))),
+            ("bunting", .bunting, [a, b, c, d, e], a(b(c, d, e))),
+            ("cardinal", .cardinal, [a, b, c], a(c, b)),
+            ("cardinal once removed", .cardinalOnceRemoved, [a, b, c, d], a(b, d, c)),
+            ("cardinal twice removed", .cardinalTwiceRemoved, [a, b, c, d, e], a(b, c, e, d)),
+            ("converse warbler", .converseWarbler, [a, b], b(a, a)),
+            ("dickcissel", .dickcissel, [a, b, c, d, e], a(b, c, d(e))),
+            ("double mockingbird", .doubleMockingbird, [a, b], a(b, a(b))),
+            ("dove", .dove, [a, b, c, d], a(b, c(d))),
+            ("dovekie", .dovekie, [a, b, c, d, e], a(b(c), d(e))),
+            ("eagle", .eagle, [a, b, c, d, e], a(b, c(d, e))),
+            ("finch", .finch, [a, b, c], c(b, a)),
+            ("finch once removed", .finchOnceRemoved, [a, b, c, d], a(d, c, b)),
+            ("finch twice removed", .finchTwiceRemoved, [a, b, c, d, e], a(b, e, d, c)),
+            ("goldfinch", .goldfinch, [a, b, c, d], a(d, b(c))),
+            ("hummingbird", .hummingbird, [a, b, c], a(b, c, b)),
+            ("idiot", .idiot, [a], a),
+            ("idiot once removed", .idiotOnceRemoved, [a, b], a(b)),
+            ("jay", .jay, [a, b, c, d], a(b, a(d, c))),
+            ("kestrel", .kestrel, [a, b], a),
+            ("kite", .kite, [a, b], b),
+            ("lark", .lark, [a, b], a(b(b))),
+            ("mockingbird", .mockingbird, [a], a(a)),
+            ("owl", .owl, [a, b], b(a(b))),
+            ("quacky bird", .quackyBird, [a, b, c], c(b(a))),
+            ("queer bird", .queerBird, [a, b, c], b(a(c))),
+            ("quirky bird", .quirkyBird, [a, b, c], c(a(b))),
+            ("quixotic bird", .quixoticBird, [a, b, c], a(c(b))),
+            ("quizzical bird", .quizzicalBird, [a, b, c], b(c(a))),
+            ("robin", .robin, [a, b, c], b(c, a)),
+            ("robin once removed", .robinOnceRemoved, [a, b, c, d], a(c, d, b)),
+            ("robin twice removed", .robinTwiceRemoved, [a, b, c, d, e], a(b, d, e, c)),
+            ("starling", .starling, [a, b, c], a(c, b(c))),
+            ("thrush", .thrush, [a, b], b(a)),
+            ("Turing bird", .turingBird, [a, b], b(a(a, b))),
+            ("vireo", .vireo, [a, b, c], c(a, b)),
+            ("vireo once removed", .vireoOnceRemoved, [a, b, c, d], a(d, b, c)),
+            ("vireo twice removed", .vireoTwiceRemoved, [a, b, c, d, e], a(b, e, c, d)),
+            ("warbler", .warbler, [a, b], a(b, b)),
+            ("warbler once removed", .warblerOnceRemoved, [a, b, c], a(b, c, c)),
+            ("warbler twice removed", .warblerTwiceRemoved, [a, b, c, d], a(b, c, d, d)),
+        ]
+    }
+
+    @Test func everyBirdObeysItsLaw() throws {
+        for (name, bird, arguments, result) in laws {
+            #expect(try Term.applying(bird, to: arguments).normalize(maxSteps: 10_000) == result,
+                    "the \(name) disobeyed its law")
+        }
+    }
+
+    @Test func lawsAreStableUnderExtraArguments() throws {
+        // A bird's law holds with a trailing argument tacked on, too.
+        for (name, bird, arguments, result) in laws {
+            #expect(try Term.applying(bird, to: arguments + [g]).normalize(maxSteps: 10_000) == result(g),
+                    "the \(name) disobeyed its law with an extra argument")
+        }
+    }
+
+    @Test func sageBirdsUnfoldFixedPoints() throws {
+        for (name, sage) in [("sage", Term.sage), ("theta", Term.theta)] {
+            func unfoldsToF(_ term: Term) -> Term? {
+                term.reductions.prefix(50).first {
+                    if case .apply(.variable("f"), _) = $0 { true } else { false }
+                }
+            }
+            let unfolded = try #require(unfoldsToF(sage(f)), "\(name) never unfolded to f(…)")
+            guard case .apply(.variable("f"), let inner) = unfolded else { continue }
+            #expect(unfoldsToF(inner) != nil, "\(name) stopped unfolding after one f(…)")
+        }
+    }
+
+    @Test func aviaryIsWellFormed() {
+        let names = Term.aviary.map(\.name)
+        #expect(Set(names).count == names.count, "duplicate bird names")
+        #expect(laws.count == Term.aviary.count - 2)  // every bird but the two sages has a law
+        for (name, bird) in Term.aviary {
+            #expect(bird.freeVariables.isEmpty, "the \(name) is not a closed term")
+        }
+    }
+
+    @Test func bookConstructions() throws {
+        // A few identities the book celebrates.
+        #expect(Term.theta == Term.turingBird(.turingBird))         // Θ = UU
+        #expect(try Term.lark(f).isEquivalent(to: .b(f, .m)))       // L f = B f M
+        #expect(try Term.mockingbird(a).isEquivalent(to: .w(.i, a)))  // M ≡ WI, extensionally
+        #expect(try Term.robin(.robin, .robin, a, b, c).normalize() == a(c, b))  // RRR ≡ C
+    }
+}
+
 @Suite("Iota and Jot")
 struct IotaJotTests {
     @Test func iotaRule() throws {
