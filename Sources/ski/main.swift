@@ -79,7 +79,10 @@ let help = """
     :birds             list every bird from “To Mock a Mockingbird”
     :basis <name>      show or set the basis (ski, bckw, iota or x) lambdas
                        are eliminated into
-    :to <basis> <expr> rewrite a term into the given basis
+    :to <basis> <expr> rewrite a term into the given basis; :to lambda
+                       decompiles it into a β-normal λ-term
+    :lam [-v] <expr>   β-reduce a pure λ-term (every letter is a variable);
+                       -v prints every step
     :iota <prog|expr>  evaluate an Iota program (*FG notation), or encode
                        a closed term as one
     :jot <bits|expr>   evaluate a Jot program (a string of 0s and 1s), or
@@ -146,10 +149,45 @@ if !arguments.isEmpty {
             } catch {
                 print("error: \(error)")
             }
+        case let input where input.hasPrefix(":lam "):
+            var text = String(input.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            let verbose = text.hasPrefix("-v ")
+            if verbose { text = String(text.dropFirst(3)) }
+            do {
+                let lambda = try Lambda(parsing: text)
+                if verbose {
+                    for step in lambda.reductions.prefix(maxSteps + 1) { print("  \(step)") }
+                }
+                let normal = try lambda.normalize(maxSteps: maxSteps)
+                var annotations: [String] = []
+                if let n = normal.naturalValue() { annotations.append("\(n)") }
+                if let b = normal.booleanValue() { annotations.append("\(b)") }
+                print("\(normal)\(annotations.isEmpty ? "" : "    -- \(annotations.joined(separator: ", "))")")
+            } catch {
+                print("error: \(error)")
+            }
         case let input where input.hasPrefix(":to "):
             let parts = input.dropFirst(4).split(separator: " ", maxSplits: 1)
-            guard parts.count == 2, let target = basisNamed(String(parts[0])) else {
-                print("error: expected :to <ski|bckw> <expression>")
+            guard parts.count == 2 else {
+                print("error: expected :to <ski|bckw|iota|x|lambda> <expression>")
+                continue
+            }
+            if ["lambda", "lam", "λ"].contains(String(parts[0])) {
+                do {
+                    let term = expand(try Term(parsing: String(parts[1]), basis: basis))
+                    let lambda = Lambda(term)
+                    if let normal = try? lambda.normalize(maxSteps: maxSteps) {
+                        print(normal.alphaNormalized())
+                    } else {
+                        print("\(lambda)    -- no β-normal form within \(maxSteps) steps")
+                    }
+                } catch {
+                    print("error: \(error)")
+                }
+                continue
+            }
+            guard let target = basisNamed(String(parts[0])) else {
+                print("error: expected :to <ski|bckw|iota|x|lambda> <expression>")
                 continue
             }
             do {

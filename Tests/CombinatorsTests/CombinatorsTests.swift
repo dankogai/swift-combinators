@@ -186,6 +186,116 @@ struct BCKWTests {
     }
 }
 
+@Suite("Lambda calculus")
+struct LambdaTests {
+    @Test func parsingAndPrintingRoundTrip() throws {
+        for source in ["λx.x", "λxy.x", "λf.(λx.f(xx))(λx.f(xx))", "x(λy.y)z", "λx′.x′ x"] {
+            let term = try Lambda(parsing: source)
+            #expect(term.description == source)
+            #expect(try Lambda(parsing: term.description) == term)
+        }
+        #expect(try Lambda(parsing: #"\x.x"#) == "λx.x")
+        #expect(try Lambda(parsing: #"\x -> x"#) == "λx.x")
+        #expect(try Lambda(parsing: "λx'.x'") == "λx′.x′")   // ASCII primes normalize
+    }
+
+    @Test func parseErrors() {
+        for bad in ["", "λ.x", "(x", "x)", "λx", "λλ.x"] {
+            #expect(throws: ParseError.self, "\(bad.debugDescription) should not parse") {
+                try Lambda(parsing: bad)
+            }
+        }
+    }
+
+    @Test func betaReduction() throws {
+        #expect(try Lambda("(λx.x)y").normalize() == .variable("y"))
+        #expect(try Lambda("(λxy.x)ab").normalize() == .variable("a"))
+        #expect(Array(Lambda("(λxy.x)ab").reductions) == ["(λxy.x)ab", "(λy.a)b", "a"])
+        #expect(Lambda("λx.x").isNormalForm)
+        #expect(!Lambda("λx.(λy.y)x").isNormalForm)   // reduces under the λ
+    }
+
+    @Test func captureAvoidance() throws {
+        // Substituting y for x under λy must rename the binder, not capture.
+        let reduced = try Lambda("(λxy.xy)y").normalize()
+        #expect(reduced.isAlphaEquivalent(to: "λz.yz"))
+        #expect(!reduced.isAlphaEquivalent(to: "λy.yy"))   // the capturing mistake
+    }
+
+    @Test func normalOrder() throws {
+        let omega = "(λx.xx)(λx.xx)"
+        #expect(try Lambda(parsing: "(λxy.y)(\(omega))w").normalize() == .variable("w"))
+        #expect(throws: LambdaReductionError.self) {
+            try Lambda(parsing: omega).normalize(maxSteps: 100)
+        }
+    }
+
+    @Test func alphaEquivalence() {
+        #expect(Lambda("λx.x").isAlphaEquivalent(to: "λy.y"))
+        #expect(!Lambda("λxy.x").isAlphaEquivalent(to: "λxy.y"))
+        #expect(Lambda("λx.xz").isAlphaEquivalent(to: "λy.yz"))
+        #expect(!Lambda("λx.xz").isAlphaEquivalent(to: "λx.xw"))   // different free variables
+        #expect(Lambda("x").isAlphaEquivalent(to: "x"))
+        #expect(!Lambda("x").isAlphaEquivalent(to: "y"))
+    }
+
+    @Test func alphaNormalization() throws {
+        #expect(Lambda("λx y′.y′x").alphaNormalized() == "λab.ba")
+        #expect(Lambda("λx.xa").alphaNormalized() == "λb.ba")   // free a is skipped
+        // The canonical form of a lifted, β-normalized combinator is tidy.
+        #expect(try Lambda(Term.b).normalize().alphaNormalized() == "λabc.a(bc)")
+        #expect(try Lambda(Term("S(KS)K")).normalize().alphaNormalized() == "λabc.a(bc)")
+        let normalized = try Lambda("(λxy.xy)y").normalize().alphaNormalized()
+        #expect(normalized == "λa.ya")
+    }
+
+    @Test func churchDecoding() throws {
+        #expect(Lambda("λfx.f(fx)").naturalValue() == 2)
+        #expect(Lambda("λxy.x").booleanValue() == true)
+        #expect(Lambda("λxy.y").booleanValue() == false)
+        // Arithmetic done wholly in the λ-world.
+        let add: Lambda = "λmnfx.mf(nfx)"
+        #expect(try add("λfx.f(fx)", "λfx.f(f(fx))").normalize().naturalValue() == 5)
+    }
+
+    @Test func compilingToCombinators() throws {
+        #expect(Lambda("λx.x").combinator() == .i)
+        #expect(Lambda("λxy.x").combinator() == .k)
+        #expect(Lambda("λxy.yx").combinator(in: .bckw) == "C(WK)")
+        for basis in Basis.allCases {
+            let flip = Lambda("λfxy.fyx").combinator(in: basis)
+            #expect(flip.isExpressed(in: basis))
+            #expect(try Term.applying(flip, to: [x, y, z]).normalize(maxSteps: 100_000) == x(z, y))
+        }
+    }
+
+    @Test func liftingCombinators() throws {
+        #expect(Lambda(Term.b).isAlphaEquivalent(to: "λabc.a(bc)"))
+        #expect(Lambda(Term.k(x)) == .application("λab.a", .variable("x")))
+        // Round trip: lift each primitive to λ, compile it back, and both
+        // must behave alike on the flushing probe.
+        let probe: [Term] = [.i, x, y, z, v("u")]
+        for primitive in [Term.s, .k, .i, .b, .c, .w, .iota, .x] {
+            let roundTripped = Lambda(primitive).combinator()
+            let expected = try Term.applying(primitive, to: probe).normalize(maxSteps: 1_000_000)
+            #expect(try Term.applying(roundTripped, to: probe).normalize(maxSteps: 1_000_000) == expected)
+        }
+    }
+
+    @Test func fixedPointCombinator() throws {
+        let yCombinator: Lambda = "λf.(λx.f(xx))(λx.f(xx))"
+        let unfolded = try #require(
+            yCombinator(.variable("g")).reductions.prefix(50).first {
+                if case .application(.variable("g"), _) = $0 { true } else { false }
+            }
+        )
+        guard case .application(.variable("g"), let inner) = unfolded else { return }
+        #expect(inner.reductions.prefix(50).contains {
+            if case .application(.variable("g"), _) = $0 { true } else { false }
+        })
+    }
+}
+
 @Suite("Basis closure")
 struct BasisClosureTests {
     let primitives: [Term] = [.s, .k, .i, .b, .c, .w, .iota, .x]
