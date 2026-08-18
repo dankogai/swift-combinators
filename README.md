@@ -1,6 +1,6 @@
 # swift-combinators
 
-Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot), the [one-point basis](https://en.wikipedia.org/wiki/Combinatory_logic#One-point_basis) `X`, and the full aviary of Smullyan's [*To Mock a Mockingbird*](https://en.wikipedia.org/wiki/To_Mock_a_Mockingbird).
+Combinator calculus in Swift — the [SKI combinator calculus](https://en.wikipedia.org/wiki/SKI_combinator_calculus), Curry's [BCKW system](https://en.wikipedia.org/wiki/B,_C,_K,_W_system), Barker's [Iota and Jot](https://en.wikipedia.org/wiki/Iota_and_Jot), the [one-point basis](https://en.wikipedia.org/wiki/Combinatory_logic#One-point_basis) `X`, the full aviary of Smullyan's [*To Mock a Mockingbird*](https://en.wikipedia.org/wiki/To_Mock_a_Mockingbird) — and a proper [λ-calculus](https://en.wikipedia.org/wiki/Lambda_calculus) front-end bridging the two worlds.
 
 ## Synopsis
 
@@ -91,6 +91,37 @@ Term.s.rewritten(in: .x)        // X(XX)
 try Term(parsing: #"\xy.yx"#, basis: .x).isExpressed(in: .x)   // true
 ```
 
+## The λ-calculus front-end
+
+`Lambda` keeps its abstractions instead of eliminating them: named binders,
+normal-order β-reduction with capture-avoiding substitution, α-equivalence,
+and conversions to and from combinators in either direction:
+
+```swift
+let two: Lambda = "λfx.f(fx)"
+two.naturalValue()                          // 2
+try Lambda("(λxy.xy)y").normalize()         // λy′.y y′ — capture avoided
+try Lambda("(λx.xx)(λx.xx)").normalize()    // throws: Ω has no β-normal form
+
+// λ → combinators (any basis), and combinators → λ:
+Lambda("λxy.yx").combinator(in: .bckw)      // C(WK)
+try Lambda(Term("S(KS)K")).normalize().alphaNormalized()   // λabc.a(bc)
+
+// α-equivalence and canonical renaming:
+Lambda("λx.x").isAlphaEquivalent(to: "λy.y")   // true
+Lambda("λx y′.y′x").alphaNormalized()          // λab.ba
+```
+
+In the REPL, `:lam` β-reduces a pure λ-term (`-v` shows every step) and
+`:to lambda` decompiles a combinator term back into a tidy λ-normal form:
+
+```
+ski> :lam (λxy.xy)y
+λy′.y y′
+ski> :to lambda J
+λabcd.ab(adc)
+```
+
 ## The aviary
 
 Every bird from *To Mock a Mockingbird*, each built by the book's own
@@ -178,6 +209,10 @@ ordinary expression — encode it into one.
   (`booleanValue()`, `naturalValue()`) to read results back.
 - The aviary — all 46 birds of *To Mock a Mockingbird* as named terms, from
   `bluebird` to `theta`, each obeying its law under test.
+- `Lambda` — the untyped λ-calculus with named binders: normal-order
+  β-reduction with capture-avoiding substitution, α-equivalence and canonical
+  renaming, plus `Lambda(term)` / `combinator(in:)` to move between the
+  λ-world and any combinator basis.
 
 ## Requirements
 
